@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth 2.0 Lab - Token</title>
+</head>
+
+<body>
+    <h1>OAuth 2.0 Lab</h1>
+
+    <h2>Token response</h2>
+
+    {% if access_token %}
+
+    <p>
+        <strong>Token type:</strong>
+        {{ token_type }}
+    </p>
+
+    <p>
+        <strong>Expires in:</strong>
+        {{ expires_in }}
+    </p>
+
+    <h3>Access Token</h3>
+
+    <pre>{{ access_token }}</pre>
+
+    <h3>Scope in the access token</h3>
+
+    <p>
+        {% for scope in scopes %}<code>{{ scope }}</code>{% if not loop.last %} {% endif %}{% endfor %}
+    </p>
+
+    <h3>Protected resources</h3>
+
+    <ul>
+        {% for path, required in resources.items() %}
+        <li>
+            <a href="{{ path }}">{{ path }}</a> — requires <code>{{ required }}</code>
+        </li>
+        {% endfor %}
+    </ul>
+
+    {% else %}
+
+    <p>No token available.</p>
+
+    {% endif %}
+
+    <p>
+        <a href="/">Back</a>
+    </p>
+</body>
+</html>

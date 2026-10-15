@@ -1,0 +1,29 @@
+# Pipeline di tracciamento del modulo Telemetry di Kyma.
+#
+# Il Telemetry Manager, vedendo questa risorsa, crea il gateway
+# OTLP del cluster (Service telemetry-otlp-traces nel namespace
+# kyma-system, porte 4317 gRPC e 4318 HTTP) a cui le applicazioni
+# inviano le trace tramite OTLP. Il gateway arricchisce le trace
+# con i metadati Kubernetes e le inoltra al backend configurato
+# qui sotto.
+#
+# Backend: APM Server. Attenzione: APM Server riceve OTLP/HTTP
+# (solo protobuf) sulla stessa porta delle richieste degli agent,
+# cioè la 8200, ai path /v1/traces, /v1/metrics e /v1/logs:
+# NON apre una porta OTLP separata. Da lì le trace vengono
+# scritte in Elasticsearch e rese visibili in Kibana (APM UI).
+#
+# Le applicazioni si configurano puntando l'exporter OTLP al
+# gateway, ad esempio con la variabile d'ambiente:
+#   OTEL_EXPORTER_OTLP_ENDPOINT=http://telemetry-otlp-traces.kyma-system:4318
+apiVersion: telemetry.kyma-project.io/v1beta1
+kind: TracePipeline
+metadata:
+  name: apm-server
+spec:
+  output:
+    otlp:
+      # APM Server accetta OTLP/HTTP (protobuf) sulla porta 8200.
+      protocol: http
+      endpoint:
+        value: http://apm-server-svc.default.svc.cluster.local:8200

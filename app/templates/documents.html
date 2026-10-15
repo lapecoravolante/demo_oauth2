@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth 2.0 Lab - {{ path }}</title>
+</head>
+
+<body>
+    <h1>OAuth 2.0 Lab</h1>
+
+    <h2>{{ path }}</h2>
+
+    <p>
+        <strong>Scope required:</strong>
+        {{ required }}
+    </p>
+
+    <p>
+        <strong>Scope in the access token:</strong>
+        {{ granted | join(', ') }}
+    </p>
+
+    {% if allowed %}
+
+    <p>
+        <strong>200 OK</strong> — the access token carries
+        <code>{{ required }}</code>, so the resource is granted.
+    </p>
+
+    <h3>Documents</h3>
+
+    <ul>
+        <li>relazione-progetti.pdf</li>
+        <li>piano-del-laboratorio.md</li>
+    </ul>
+
+    {% else %}
+
+    <p>
+        <strong>403 Forbidden</strong> — the access token does not carry
+        <code>{{ required }}</code>. The user is authenticated but not
+        authorized on this resource.
+    </p>
+
+    {% endif %}
+
+    <p>
+        <a href="/profile">Back</a>
+    </p>
+</body>
+</html>

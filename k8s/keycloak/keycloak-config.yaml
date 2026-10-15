@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: oauth-lab
+
+data:
+  oauth-lab-realm.json: |
+    {
+      "realm": "oauth-lab",
+      "enabled": true,
+
+      "displayName": "OAuth 2.0 Lab",
+
+      "sslRequired": "none",
+
+      "registrationAllowed": false,
+      "resetPasswordAllowed": false,
+      "rememberMe": false,
+
+      "defaultDefaultClientScopes": [
+        "documents:read"
+      ],
+
+      "clientScopes": [
+        {
+          "name": "documents:read",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true",
+            "display.on.consent.screen": "false"
+          }
+        },
+        {
+          "name": "secret:read",
+          "protocol": "openid-connect",
+          "attributes": {
+            "include.in.token.scope": "true",
+            "display.on.consent.screen": "false"
+          }
+        }
+      ],
+
+      "clients": [
+        {
+          "clientId": "demo-client",
+          "name": "OAuth Demo Client",
+
+          "enabled": true,
+
+          "publicClient": false,
+          "clientAuthenticatorType": "client-secret",
+
+          "secret": "demo-client-secret",
+
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": false,
+          "implicitFlowEnabled": false,
+          "serviceAccountsEnabled": false,
+
+          "fullScopeAllowed": true,
+
+          "defaultClientScopes": [
+            "documents:read"
+          ],
+          "optionalClientScopes": [
+            "secret:read"
+          ],
+
+          "redirectUris": [
+            "http://localhost:30080/callback"
+          ],
+
+          "webOrigins": [
+            "http://localhost:30080"
+          ]
+        }
+      ],
+
+      "users": [
+        {
+          "username": "ivan",
+          "enabled": true,
+
+          "firstName": "Ivan",
+          "lastName": "Ballatore",
+
+          "email": "ivan@example.local",
+          "emailVerified": true,
+
+          "credentials": [
+            {
+              "type": "password",
+              "value": "ivan",
+              "temporary": false
+            }
+          ]
+        }
+      ]
+    }

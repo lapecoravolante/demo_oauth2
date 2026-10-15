@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OAuth 2.0 Lab</title>
+</head>
+
+<body>
+    <h1>OAuth 2.0 Lab</h1>
+
+    <p>
+        Authorization Code Flow
+    </p>
+
+    {% if authenticated %}
+
+    <p>
+        Session active.
+    </p>
+
+    <ul>
+        <li><a href="/documents">/documents</a></li>
+        <li><a href="/secret_documents">/secret_documents</a></li>
+        <li><a href="/profile">/profile</a></li>
+    </ul>
+
+    {% else %}
+
+    <p>
+        <a href="/login">
+            Login with Keycloak
+        </a>
+    </p>
+
+    {% endif %}
+
+</body>
+</html>

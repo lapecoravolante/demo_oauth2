@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oauth-client
+  namespace: oauth-lab
+  labels:
+    app: oauth-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oauth-client
+  template:
+    metadata:
+      labels:
+        app: oauth-client
+    spec:
+      containers:
+        - name: oauth-client
+          image: fotati4255/demo:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: KEYCLOAK_BASE_URL
+              value: "http://keycloak.oauth-lab.svc.cluster.local:8080"
+            - name: KEYCLOAK_PUBLIC_URL
+              value: "http://localhost:30081"
+            - name: KEYCLOAK_REALM
+              value: "oauth-lab"
+            - name: OAUTH_CLIENT_ID
+              value: "demo-client"
+            - name: OAUTH_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: demo-client-secret
+            - name: OAUTH_REDIRECT_URI
+              value: "http://localhost:30080/callback"
+            - name: OAUTH_SCOPE
+              value: "documents:read"
+            # OpenTelemetry - trace verso Kyma Telemetry Collector (TracePipeline)
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_SERVICE_NAME
+              value: "oauth-client"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
