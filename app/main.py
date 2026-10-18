@@ -17,14 +17,11 @@ Endpoint:
 Lo scambio di token con Keycloak vive in `oauth.py`; qui ci sono i passaggi
 HTTP, la sessione e la verifica degli scope.
 
-La telemetria è completamente automatica e non richiede codice:
-FastAPIInstrumentor strumenta le richieste in entrata e
-HTTPXClientInstrumentor le chiamate in uscita verso Keycloak.
-Il Tracer Provider e l'exporter OTLP sono invece configurati
-dall'ambiente tramite il wrapper `opentelemetry-instrument`
-usato nel Dockerfile: OTEL_EXPORTER_OTLP_ENDPOINT punta al
-gateway OTLP del modulo Telemetry di Kyma, la pipeline che li
-riceve è definita in k8s/telemetria/tracepipeline.yaml.
+La telemetria è gestita dall'auto-instrumentazione
+dell'OpenTelemetry Operator per Kubernetes (injection), senza
+modifiche al codice: le trace e gli span vengono inviati
+all'APM di Kibana tramite il gateway OTLP del cluster.
+Le variabili OTEL_* si impostano nel deployment YAML.
 """
 
 import base64
@@ -36,11 +33,6 @@ from urllib.parse import urlencode
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-
-# Instrumentazione automatica: FastAPI cattura le richieste in entrata,
-# httpx cattura le chiamate in uscita (verso Keycloak).
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from oauth import (
     CLIENT_ID,
@@ -54,13 +46,8 @@ from oauth import (
 
 app = FastAPI(
     title="OAuth 2.0 Lab Client",
+    telemetry={"auto_configure": False},
 )
-
-# Instrumenta FastAPI: cattura richieste in entrata
-FastAPIInstrumentor.instrument_app(app)
-
-# Instrumenta httpx: cattura chiamate HTTP in uscita (verso Keycloak)
-HTTPXClientInstrumentor().instrument()
 
 templates = Jinja2Templates(
     directory="templates",

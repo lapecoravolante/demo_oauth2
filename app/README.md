@@ -507,42 +507,28 @@ Da questo momento in poi L'Applicazione agisce anche da Resource Server e usa il
 
 ---
 
-# 25 — Telemetria: OpenTelemetry con Kyma Telemetry Manager
+# 8. OpenTelemetry con Kyma Telemetry Manager
 
 ## Cosa fa
 
-Ogni passaggio del flusso OAuth 2.0 viene tracciato come **span** di OpenTelemetry, così che in Kibana è possibile ricostruire l'intera sequenza di autorizzazione:
+Le richieste HTTP gestite da FastAPI e le chiamate uscenti verso Keycloak vengono tracciate automaticamente come **span** OpenTelemetry dall'instrumentazione iniettata dall'OpenTelemetry Operator. In Kibana è possibile ricostruire il flusso di autorizzazione OAuth 2.0:
 
 ```text
 GET /
-    → http.server.request (step 1)
+    → http.server.request
 GET /login
-    → oauth.authorization_request (step 3)
-        └── oauth.discovery (step 2, FastAPI → Keycloak)
-        └── httpx GET /.well-known/openid-configuration (auto-instrumented)
+    → http.server.request
+    └── httpx GET /.well-known/openid-configuration
 GET /callback
-    → oauth.authorization_callback (step 6)
-        └── oauth.token_request (step 7, FastAPI → Keycloak)
-        └── httpx POST /token (auto-instrumented)
+    → http.server.request
+    └── httpx POST /token
 GET /documents
-    → http.server.request (step 11)
-        └── oauth.resource_authorization (verifica scope documents:read)
+    → http.server.request
 GET /secret_documents
-    → http.server.request (step 12)
-        └── oauth.resource_authorization (verifica scope secret:read → 403)
+    → http.server.request
 ```
 
-Ogni span riporta gli stessi attributi del sequence diagram:
-
-| Attributo | Descrizione |
-|---|---|
-| `oauth.step` | Numerazione del passo (1-12), coincide con i commenti di `main.py`. |
-| `oauth.step.name` | Nome leggibile del passo. |
-| `oauth.actor` | Chi compie l'azione (`L'Applicazione`, `Keycloak`). |
-| `oauth.target` | A chi è rivolta la chiamata (es. `Keycloak`). |
-| `oauth.description` | Spiegazione didattica del passo. |
-| `http.method`, `http.route`, `http.url` | Dettagli della richiesta HTTP. |
-| `oauth.client_id`, `oauth.scope`, `oauth.redirect_uri` | Parametri OAuth rilevanti. |
+Gli span contengono gli attributi standard OpenTelemetry (es. `http.method`, `http.route`, `http.url`, `http.status_code`).
 
 ## Architettura Telemetria
 
@@ -586,41 +572,58 @@ spec:
 
 Il Telemetry Manager crea automaticamente il Service `telemetry-otlp-traces` nel namespace `kyma-system` sulle porte 4317 (gRPC) e 4318 (HTTP).
 
-### Configurazione nell'Applicazione
+### Risorsa Instrumentation (OpenTelemetry Operator)
 
-Le variabili d'ambiente OpenTelemetry sono definite nel **Deployment Kubernetes** (`k8s/app/deployment.yaml`), non nel Dockerfile:
+L'OpenTelemetry Operator inietta l'auto-instrumentazione Python nei pod dell'applicazione. L'injection si attiva in due fasi:
+
+**1. Annotazione sul deployment** (`k8s/app/deployment.yaml`):
 
 ```yaml
-env:
-  - name: OTEL_EXPORTER_OTLP_ENDPOINT
-    value: "http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318"
-  - name: OTEL_EXPORTER_OTLP_PROTOCOL
-    value: "http/protobuf"
-  - name: OTEL_TRACES_EXPORTER
-    value: "otlp"
-  - name: OTEL_METRICS_EXPORTER
-    value: "none"
-  - name: OTEL_LOGS_EXPORTER
-    value: "none"
-  - name: OTEL_SERVICE_NAME
-    value: "oauth-client"
+spec:
+  template:
+    metadata:
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
 ```
 
-Il `Dockerfile` usa `opentelemetry-instrument` come wrapper per l'auto-instrumentazione zero-code:
+Questa annotazione dice all'operatore di iniettare un init-container (`opentelemetry-auto-instrumentation-python`) nel pod all'avvio.
 
-```dockerfile
-FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim
-WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-COPY pyproject.toml uv.lock ./
-COPY src ./src
-COPY templates ./templates
-COPY main.py oauth.py README.md ./
-RUN uv sync --frozen --no-dev
-RUN uv run opentelemetry-bootstrap -a requirements | uv add --requirement -
-CMD ["uv", "run", "--no-dev", "opentelemetry-instrument", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+**2. Risorsa `Instrumentation`** (`k8s/telemetria/instrumentation.yaml`):
+
+```yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: oauth-client
+  namespace: oauth-lab
+spec:
+  exporter:
+    endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: always_on
+  python:
+    env:
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf
+      - name: OTEL_TRACES_EXPORTER
+        value: otlp
+      - name: OTEL_METRICS_EXPORTER
+        value: none
+      - name: OTEL_LOGS_EXPORTER
+        value: none
+      - name: OTEL_SERVICE_NAME
+        value: oauth-client
 ```
+
+La risorsa `Instrumentation` configura:
+- **`exporter.endpoint`**: il gateway OTLP del Telemetry Manager di Kyma (`telemetry-otlp-traces.kyma-system:4318`), creato dalla `TracePipeline`.
+- **`sampler.type: always_on`**: tutte le tracce vengono esportate (utile in ambiente di laboratorio).
+- **`python.env`**: variabili d'ambiente OpenTelemetry per l'agente Python (protocollo, exporter, nome servizio).
+
+A ogni avvio del pod, l'operatore inietta l'agente Python che genera automaticamente span per le richieste FastAPI in entrata e le chiamate `httpx` in uscita verso Keycloak. Le trace fluiscono poi verso l'APM Server e infine a Kibana.
 
 ### Accesso ai Servizi (NodePort, nessun port-forward)
 
@@ -638,7 +641,6 @@ CMD ["uv", "run", "--no-dev", "opentelemetry-instrument", "uvicorn", "main:app",
 4. Clicca una transazione → vedrai la **waterfall view** con:
    - Span FastAPI (richieste in entrata)
    - Span httpx (chiamate a Keycloak)
-   - Span manuali OAuth (con attributi `oauth.step`, `oauth.description`)
    - Timing, parent/child relationships, errori
 
 ### Deploy Completo

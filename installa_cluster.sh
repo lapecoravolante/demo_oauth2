@@ -48,6 +48,18 @@ kubectl -n kyma-system wait --for=condition=Available deployment/telemetry-manag
 kubectl -n kyma-system wait --for=condition=Ready pod -l app.kubernetes.io/name=manager --timeout=300s
 kubectl apply -f k8s/telemetria/tracepipeline.yaml
 
+echo -e "${BOLD}=== 11a. cert-manager ===${RESET}"
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager --timeout=300s
+kubectl -n cert-manager wait --for=condition=Available deployment/cert-manager-webhook --timeout=300s
+
+echo -e "${BOLD}=== 11b. OpenTelemetry Operator (CRD + operatore) ===${RESET}"
+kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releases/download/v0.161.0/opentelemetry-operator.yaml
+kubectl -n opentelemetry-operator-system wait --for=condition=Available deployment/opentelemetry-operator-controller-manager --timeout=300s
+
+echo -e "${BOLD}=== 11c. Instrumentazione automatica OpenTelemetry ===${RESET}"
+kubectl apply -f k8s/telemetria/instrumentation.yaml
+
 echo -e "${BOLD}=== 12. Elastic Stack ===${RESET}"
 kubectl apply -f k8s/telemetria/elastic.yaml
 kubectl -n default wait --for=condition=Ready pod -l app=elasticsearch --timeout=300s
@@ -66,4 +78,5 @@ echo -e "${BOLD}Keycloak: http://localhost:30081${RESET}"
 podman exec kyma-control-plane kubectl config view --raw > kubeconfig
 echo -e "${BOLD}Dashboard: usa il file kubeconfig in questa directory per accedere al cluster${RESET}"
 echo -e "${BOLD}OAuth Client: http://localhost:30080 ${RESET}"
+echo -e "${BOLD}Kibana: http://localhost:30082 ${RESET}"
 echo -e "${BOLD}*****************************************************************************${RESET}"

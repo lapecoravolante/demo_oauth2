@@ -1,0 +1,35 @@
+# Instrumentazione automatica OpenTelemetry per l'applicazione oauth-client.
+#
+# Questa risorsa (opentelemetry.io/v1alpha1) dice all'OpenTelemetry Operator
+# di iniettare l'auto-instrumentazione Python nei pod che corrispondono al
+# selettore, senza modificare il codice dell'applicazione.
+#
+# L'endpoint punta al gateway OTLP del modulo Telemetry di Kyma (creato dalla
+# TracePipeline apm-server), che inoltra le trace all'APM Server e quindi a
+# Kibana. Le variabili OTEL_* sotto spec.python.env sovrascrivono quelle del
+# deployment.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: oauth-client
+  namespace: oauth-lab
+spec:
+  exporter:
+    endpoint: http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: always_on
+  python:
+    env:
+      - name: OTEL_EXPORTER_OTLP_PROTOCOL
+        value: http/protobuf
+      - name: OTEL_TRACES_EXPORTER
+        value: otlp
+      - name: OTEL_METRICS_EXPORTER
+        value: none
+      - name: OTEL_LOGS_EXPORTER
+        value: none
+      - name: OTEL_SERVICE_NAME
+        value: oauth-client

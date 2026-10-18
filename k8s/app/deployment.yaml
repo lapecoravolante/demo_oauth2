@@ -14,11 +14,13 @@ spec:
     metadata:
       labels:
         app: oauth-client
+      annotations:
+        instrumentation.opentelemetry.io/inject-python: "true"
     spec:
       containers:
         - name: oauth-client
           image: fotati4255/demo:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
@@ -39,19 +41,6 @@ spec:
               value: "http://localhost:30080/callback"
             - name: OAUTH_SCOPE
               value: "documents:read"
-            # OpenTelemetry - trace verso Kyma Telemetry Collector (TracePipeline)
-            - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://telemetry-otlp-traces.kyma-system.svc.cluster.local:4318"
-            - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: "http/protobuf"
-            - name: OTEL_TRACES_EXPORTER
-              value: "otlp"
-            - name: OTEL_METRICS_EXPORTER
-              value: "none"
-            - name: OTEL_LOGS_EXPORTER
-              value: "none"
-            - name: OTEL_SERVICE_NAME
-              value: "oauth-client"
           readinessProbe:
             httpGet:
               path: /
