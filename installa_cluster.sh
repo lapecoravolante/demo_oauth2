@@ -46,7 +46,15 @@ kubectl apply -f https://github.com/kyma-project/telemetry-manager/releases/late
 kubectl apply -f https://github.com/kyma-project/telemetry-manager/releases/latest/download/telemetry-default-cr.yaml -n kyma-system
 kubectl -n kyma-system wait --for=condition=Available deployment/telemetry-manager --timeout=300s
 kubectl -n kyma-system wait --for=condition=Ready pod -l app.kubernetes.io/name=manager --timeout=300s
-kubectl apply -f k8s/telemetria/tracepipeline.yaml
+# Il webhook di telemetry-manager gira nello stesso pod del manager.
+# Riprova l'applicazione finché il webhook non è raggiungibile.
+for i in $(seq 1 10); do
+  if kubectl apply -f k8s/telemetria/tracepipeline.yaml; then
+    break
+  fi
+  echo "Webhook telemetry-manager non ancora pronto, riprovo tra 5s ($i/10)..."
+  sleep 5
+done
 
 echo -e "${BOLD}=== 11a. cert-manager ===${RESET}"
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
@@ -58,7 +66,15 @@ kubectl apply -f https://github.com/open-telemetry/opentelemetry-operator/releas
 kubectl -n opentelemetry-operator-system wait --for=condition=Available deployment/opentelemetry-operator-controller-manager --timeout=300s
 
 echo -e "${BOLD}=== 11c. Instrumentazione automatica OpenTelemetry ===${RESET}"
-kubectl apply -f k8s/telemetria/instrumentation.yaml
+# Il webhook dell'operatore gira nello stesso pod del controller-manager.
+# Riprova l'applicazione finché il webhook non è raggiungibile.
+for i in $(seq 1 10); do
+  if kubectl apply -f k8s/telemetria/instrumentation.yaml; then
+    break
+  fi
+  echo "Webhook OpenTelemetry non ancora pronto, riprovo tra 5s ($i/10)..."
+  sleep 5
+done
 
 echo -e "${BOLD}=== 12. Elastic Stack ===${RESET}"
 kubectl apply -f k8s/telemetria/elastic.yaml
